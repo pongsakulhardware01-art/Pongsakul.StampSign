@@ -14,6 +14,7 @@ import { SignaturePadModal } from './components/SignaturePadModal';
 import { UploadModal } from './components/UploadModal';
 import { TextSignatureModal } from './components/TextSignatureModal';
 import { ExportModal } from './components/ExportModal';
+import { ClearConfirmModal } from './components/ClearConfirmModal';
 import { Layer, SavedAsset } from './types';
 
 export default function App() {
@@ -47,8 +48,20 @@ export default function App() {
   const [isUploadOpen, setIsUploadOpen] = useState<boolean>(false);
   const [isTextSignatureOpen, setIsTextSignatureOpen] = useState<boolean>(false);
   const [isExportOpen, setIsExportOpen] = useState<boolean>(false);
+  const [isClearModalOpen, setIsClearModalOpen] = useState<boolean>(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Clear workspace to start a new document
+  const handleClearWorkspace = () => {
+    setBaseImageUrl(null);
+    setLayers([]);
+    setSelectedLayerId(null);
+    setHistory([]);
+    setHistoryIndex(-1);
+    setZoom(0.75);
+    setPan({ x: 0, y: 0 });
+  };
 
   // Listen to Shared Cloud Assets in Real-Time (No Login Required)
   useEffect(() => {
@@ -360,6 +373,8 @@ export default function App() {
         onOpenUploadSignature={() => setIsUploadOpen(true)}
         onOpenTextSignature={() => setIsTextSignatureOpen(true)}
         onUploadBaseImage={handleUploadBaseImage}
+        onClearWorkspace={() => setIsClearModalOpen(true)}
+        hasActiveDocument={Boolean(baseImageUrl)}
         onOpenExport={() => setIsExportOpen(true)}
         canUndo={historyIndex > 0}
         canRedo={historyIndex < history.length - 1}
@@ -480,6 +495,13 @@ export default function App() {
           baseImageName={baseImageName}
         />
       )}
+
+      <ClearConfirmModal
+        isOpen={isClearModalOpen}
+        onClose={() => setIsClearModalOpen(false)}
+        onConfirm={handleClearWorkspace}
+        layerCount={layers.length}
+      />
     </div>
   );
 }

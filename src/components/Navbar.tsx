@@ -10,6 +10,7 @@ import {
   FolderOpen,
   Layers,
   Cloud,
+  FilePlus2,
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -18,6 +19,8 @@ interface NavbarProps {
   onOpenUploadSignature: () => void;
   onOpenTextSignature: () => void;
   onUploadBaseImage: (file: File) => void;
+  onClearWorkspace: () => void;
+  hasActiveDocument: boolean;
   onOpenExport: () => void;
   canUndo: boolean;
   canRedo: boolean;
@@ -37,6 +40,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenUploadSignature,
   onOpenTextSignature,
   onUploadBaseImage,
+  onClearWorkspace,
+  hasActiveDocument,
   onOpenExport,
   canUndo,
   canRedo,
@@ -68,8 +73,8 @@ export const Navbar: React.FC<NavbarProps> = ({
         className="hidden"
       />
 
-      {/* Brand & Base Image Selector */}
-      <div className="flex items-center gap-3">
+      {/* Brand & Base Image Selector & Clear button */}
+      <div className="flex items-center gap-2.5">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-red-600 to-rose-500 flex items-center justify-center shadow-md shadow-red-600/25">
             <Stamp className="w-5 h-5 text-white" />
@@ -93,6 +98,18 @@ export const Navbar: React.FC<NavbarProps> = ({
           <FolderOpen className="w-3.5 h-3.5" />
           <span>อัปโหลดภาพเอกสาร</span>
         </button>
+
+        {/* Clear Workspace Button (To start new file) */}
+        {hasActiveDocument && (
+          <button
+            onClick={onClearWorkspace}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 transition active:scale-95 cursor-pointer shadow-2xs animate-in fade-in duration-150"
+            title="ล้างหน้าจอเพื่อเริ่มทำไฟล์ใหม่"
+          >
+            <FilePlus2 className="w-3.5 h-3.5 text-red-600" />
+            <span>เคลียร์หน้างาน</span>
+          </button>
+        )}
 
         {/* Cloud Library Toggle */}
         <button
