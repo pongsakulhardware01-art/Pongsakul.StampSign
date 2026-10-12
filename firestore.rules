@@ -1,0 +1,51 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
+    }
+
+    function isValidSavedAsset(data, userId) {
+      return data.userId == userId
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 100
+        && data.type in ['signature', 'stamp', 'image']
+        && data.imageUrl is string && data.imageUrl.size() > 0
+        && data.width is number && data.width > 0
+        && data.height is number && data.height > 0
+        && data.relativeX is number && data.relativeX >= 0 && data.relativeX <= 1
+        && data.relativeY is number && data.relativeY >= 0 && data.relativeY <= 1
+        && data.relativeWidth is number && data.relativeWidth > 0 && data.relativeWidth <= 1;
+    }
+
+    // User's saved signatures and stamps
+    match /users/{userId}/saved_assets/{assetId} {
+      allow get, list: if isOwner(userId);
+      allow create: if isOwner(userId)
+        && isValidId(assetId)
+        && isValidSavedAsset(incoming(), userId);
+      allow update: if isOwner(userId)
+        && isValidId(assetId)
+        && isValidSavedAsset(incoming(), userId)
+        && incoming().userId == resource.data.userId;
+      allow delete: if isOwner(userId) && isValidId(assetId);
+    }
+  }
+}
