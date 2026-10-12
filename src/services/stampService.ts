@@ -5,14 +5,17 @@ import {
   deleteDoc,
   updateDoc,
   onSnapshot,
-  query,
-  orderBy,
   Unsubscribe,
 } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { SavedAsset } from '../types';
 
 const LOCAL_STORAGE_KEY = 'stampsign_local_assets_v1';
+const LOCAL_STORAGE_EVENT = 'stampsign_local_storage_changed';
+
+function notifyLocalChange() {
+  window.dispatchEvent(new Event(LOCAL_STORAGE_EVENT));
+}
 
 // Helpers for guest local storage
 function getLocalAssets(): SavedAsset[] {
@@ -27,6 +30,7 @@ function getLocalAssets(): SavedAsset[] {
 function saveLocalAssets(assets: SavedAsset[]) {
   try {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(assets));
+    notifyLocalChange();
   } catch (e) {
     console.error('Failed to save to localStorage', e);
   }
@@ -34,7 +38,7 @@ function saveLocalAssets(assets: SavedAsset[]) {
 
 /**
  * Subscribe to saved assets. If signed in, listens in real-time to Firestore.
- * If not signed in, reads from localStorage.
+ * If not signed in, reads from localStorage and reacts to updates immediately.
  */
 export function subscribeToSavedAssets(
   userId: string | null,
@@ -43,9 +47,13 @@ export function subscribeToSavedAssets(
   if (!userId) {
     // Guest mode: load from localStorage
     onUpdate(getLocalAssets());
-    const storageHandler = () => onUpdate(getLocalAssets());
-    window.addEventListener('storage', storageHandler);
-    return () => window.removeEventListener('storage', storageHandler);
+    const handler = () => onUpdate(getLocalAssets());
+    window.addEventListener('storage', handler);
+    window.addEventListener(LOCAL_STORAGE_EVENT, handler);
+    return () => {
+      window.removeEventListener('storage', handler);
+      window.removeEventListener(LOCAL_STORAGE_EVENT, handler);
+    };
   }
 
   const collectionPath = `users/${userId}/saved_assets`;
@@ -184,4 +192,5 @@ export async function migrateLocalAssetsToCloud(userId: string): Promise<void> {
 
   // Clear local storage after successful migration
   localStorage.removeItem(LOCAL_STORAGE_KEY);
+  notifyLocalChange();
 }

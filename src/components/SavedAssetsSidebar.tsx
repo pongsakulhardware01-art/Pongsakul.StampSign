@@ -6,6 +6,7 @@ import {
   LogIn,
   LogOut,
   MousePointerClick,
+  User as UserIcon,
 } from 'lucide-react';
 import { SavedAsset } from '../types';
 import { User } from 'firebase/auth';
@@ -13,8 +14,7 @@ import { User } from 'firebase/auth';
 interface SavedAssetsSidebarProps {
   assets: SavedAsset[];
   user: User | null;
-  onLogin: () => void;
-  onLogout: () => void;
+  onOpenAuthModal: () => void;
   onApplyAsset: (asset: SavedAsset) => void;
   onDeleteAsset: (assetId: string) => void;
   onOpenCreateStamp: () => void;
@@ -25,8 +25,7 @@ interface SavedAssetsSidebarProps {
 export const SavedAssetsSidebar: React.FC<SavedAssetsSidebarProps> = ({
   assets,
   user,
-  onLogin,
-  onLogout,
+  onOpenAuthModal,
   onApplyAsset,
   onDeleteAsset,
   onOpenCreateStamp,
@@ -52,12 +51,16 @@ export const SavedAssetsSidebar: React.FC<SavedAssetsSidebarProps> = ({
           </div>
         </div>
 
-        {/* Auth Button */}
+        {/* Auth / Cloud Sync Button */}
         {user ? (
-          <div className="flex items-center gap-2">
+          <button
+            onClick={onOpenAuthModal}
+            className="flex items-center gap-1.5 p-1 rounded-xl hover:bg-red-100/60 transition cursor-pointer"
+            title="ดูสถานะบัญชีคลาวด์"
+          >
             <div
-              className="w-6 h-6 rounded-full overflow-hidden border border-red-500 ring-2 ring-red-500/20"
-              title={user.email || 'เข้าสู่ระบบแล้ว'}
+              className="w-7 h-7 rounded-full overflow-hidden border-2 border-emerald-500 ring-2 ring-emerald-500/20"
+              title={user.email || 'เชื่อมต่อคลาวด์แล้ว'}
             >
               {user.photoURL ? (
                 <img src={user.photoURL} alt="Avatar" className="w-full h-full object-cover" />
@@ -67,19 +70,12 @@ export const SavedAssetsSidebar: React.FC<SavedAssetsSidebarProps> = ({
                 </div>
               )}
             </div>
-            <button
-              onClick={onLogout}
-              className="p-1 rounded-lg text-zinc-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
-              title="ออกจากระบบ"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          </button>
         ) : (
           <button
-            onClick={onLogin}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold text-white bg-red-600 hover:bg-red-700 shadow-xs shadow-red-600/20 transition active:scale-95 cursor-pointer"
-            title="เข้าสู่ระบบด้วย Google เพื่อซิงค์คลาวด์ข้ามอุปกรณ์"
+            onClick={onOpenAuthModal}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold text-white bg-red-600 hover:bg-red-700 shadow-xs shadow-red-600/20 transition active:scale-95 cursor-pointer"
+            title="คลิกเพื่อเชื่อมต่อและเข้าสู่ระบบคลาวด์"
           >
             <LogIn className="w-3.5 h-3.5" />
             <span className="text-[11px]">ซิงค์คลาวด์</span>

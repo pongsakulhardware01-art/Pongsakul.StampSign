@@ -17,6 +17,7 @@ import { SignaturePadModal } from './components/SignaturePadModal';
 import { UploadModal } from './components/UploadModal';
 import { TextSignatureModal } from './components/TextSignatureModal';
 import { ExportModal } from './components/ExportModal';
+import { AuthModal } from './components/AuthModal';
 import { Layer, SavedAsset } from './types';
 
 export default function App() {
@@ -51,6 +52,7 @@ export default function App() {
   const [isUploadOpen, setIsUploadOpen] = useState<boolean>(false);
   const [isTextSignatureOpen, setIsTextSignatureOpen] = useState<boolean>(false);
   const [isExportOpen, setIsExportOpen] = useState<boolean>(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -401,8 +403,7 @@ export default function App() {
             <SavedAssetsSidebar
               assets={savedAssets}
               user={user}
-              onLogin={loginWithGoogle}
-              onLogout={logout}
+              onOpenAuthModal={() => setIsAuthModalOpen(true)}
               onApplyAsset={handleApplySavedAsset}
               onDeleteAsset={deleteSavedAsset}
               onOpenCreateStamp={() => setIsStampMakerOpen(true)}
@@ -503,6 +504,13 @@ export default function App() {
           baseImageName={baseImageName}
         />
       )}
+
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        user={user}
+        savedAssetsCount={savedAssets.length}
+      />
     </div>
   );
 }
