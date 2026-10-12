@@ -7,17 +7,16 @@ import {
   onSnapshot,
   Unsubscribe,
 } from 'firebase/firestore';
-import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { SavedAsset } from '../types';
 
-const LOCAL_STORAGE_KEY = 'stampsign_local_assets_v1';
+const LOCAL_STORAGE_KEY = 'stampsign_org_shared_assets_v2';
 const LOCAL_STORAGE_EVENT = 'stampsign_local_storage_changed';
 
 function notifyLocalChange() {
   window.dispatchEvent(new Event(LOCAL_STORAGE_EVENT));
 }
 
-// Helpers for guest local storage
 function getLocalAssets(): SavedAsset[] {
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -37,83 +36,88 @@ function saveLocalAssets(assets: SavedAsset[]) {
 }
 
 /**
- * Subscribe to saved assets. If signed in, listens in real-time to Firestore.
- * If not signed in, reads from localStorage and reacts to updates immediately.
+ * Subscribe to Organization Shared Cloud Assets in real-time.
+ * Automatically synchronizes with Cloud Firestore without requiring any user login!
  */
 export function subscribeToSavedAssets(
-  userId: string | null,
+  _userId: string | null,
   onUpdate: (assets: SavedAsset[]) => void
 ): Unsubscribe {
-  if (!userId) {
-    // Guest mode: load from localStorage
-    onUpdate(getLocalAssets());
-    const handler = () => onUpdate(getLocalAssets());
-    window.addEventListener('storage', handler);
-    window.addEventListener(LOCAL_STORAGE_EVENT, handler);
-    return () => {
-      window.removeEventListener('storage', handler);
-      window.removeEventListener(LOCAL_STORAGE_EVENT, handler);
-    };
-  }
-
-  const collectionPath = `users/${userId}/saved_assets`;
+  const collectionPath = 'shared_assets';
   const q = collection(db, collectionPath);
 
-  return onSnapshot(
-    q,
-    (snapshot) => {
-      const assets: SavedAsset[] = [];
-      snapshot.forEach((docSnap) => {
-        assets.push(docSnap.data() as SavedAsset);
-      });
-      // Sort newest first
-      assets.sort(
-        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-      );
-      onUpdate(assets);
-    },
-    (error) => {
-      handleFirestoreError(error, OperationType.GET, collectionPath);
-    }
-  );
+  try {
+    const unsub = onSnapshot(
+      q,
+      (snapshot) => {
+        const assets: SavedAsset[] = [];
+        snapshot.forEach((docSnap) => {
+          assets.push(docSnap.data() as SavedAsset);
+        });
+
+        // Sort newest first
+        assets.sort(
+          (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        );
+
+        // Update local cache as backup
+        if (assets.length > 0) {
+          saveLocalAssets(assets);
+        }
+
+        onUpdate(assets);
+      },
+      (error) => {
+        console.warn('Firestore real-time subscription error, using local cache:', error);
+        // Fallback to local storage if Firestore connection encounters issues
+        onUpdate(getLocalAssets());
+      }
+    );
+
+    return unsub;
+  } catch (err) {
+    console.warn('Could not initialize Firestore onSnapshot, falling back to local storage:', err);
+    onUpdate(getLocalAssets());
+    const handler = () => onUpdate(getLocalAssets());
+    window.addEventListener(LOCAL_STORAGE_EVENT, handler);
+    return () => window.removeEventListener(LOCAL_STORAGE_EVENT, handler);
+  }
 }
 
 /**
- * Save a new signature or stamp to Cloud/Local
+ * Save a new signature or stamp directly to Organization Cloud Firestore
  */
 export async function createSavedAsset(
-  asset: Omit<SavedAsset, 'id' | 'createdAt' | 'updatedAt' | 'userId'>
+  asset: Omit<SavedAsset, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<SavedAsset> {
-  const userId = auth.currentUser?.uid;
   const now = new Date().toISOString();
-  const id = `asset_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+  const id = `org_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
 
   const newAsset: SavedAsset = {
     ...asset,
     id,
-    userId: userId || 'local_guest',
+    department: asset.department || 'ส่วนกลางองค์กร',
     createdAt: now,
     updatedAt: now,
   };
 
-  if (userId) {
-    const docPath = `users/${userId}/saved_assets/${id}`;
-    try {
-      await setDoc(doc(db, `users/${userId}/saved_assets`, id), newAsset);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, docPath);
-    }
-  } else {
-    const list = getLocalAssets();
-    list.unshift(newAsset);
-    saveLocalAssets(list);
+  // Always update local cache immediately for zero latency
+  const currentLocal = getLocalAssets();
+  currentLocal.unshift(newAsset);
+  saveLocalAssets(currentLocal);
+
+  // Sync to Cloud Firestore
+  try {
+    await setDoc(doc(db, 'shared_assets', id), newAsset);
+  } catch (error) {
+    console.error('Failed to sync new asset to Cloud Firestore:', error);
   }
 
   return newAsset;
 }
 
 /**
- * Update remembered position, size, and rotation for a saved asset
+ * Update remembered position, size, and rotation for a shared asset in Cloud Firestore
  */
 export async function updateAssetPlacementPreferences(
   assetId: string,
@@ -128,69 +132,39 @@ export async function updateAssetPlacementPreferences(
     blendMode?: SavedAsset['blendMode'];
   }
 ): Promise<void> {
-  const userId = auth.currentUser?.uid;
   const now = new Date().toISOString();
 
-  if (userId) {
-    const docPath = `users/${userId}/saved_assets/${assetId}`;
-    try {
-      await updateDoc(doc(db, `users/${userId}/saved_assets`, assetId), {
-        ...preferences,
-        updatedAt: now,
-      });
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, docPath);
-    }
-  } else {
-    const list = getLocalAssets();
-    const idx = list.findIndex((a) => a.id === assetId);
-    if (idx !== -1) {
-      list[idx] = { ...list[idx], ...preferences, updatedAt: now };
-      saveLocalAssets(list);
-    }
-  }
-}
-
-/**
- * Delete a saved signature or stamp
- */
-export async function deleteSavedAsset(assetId: string): Promise<void> {
-  const userId = auth.currentUser?.uid;
-
-  if (userId) {
-    const docPath = `users/${userId}/saved_assets/${assetId}`;
-    try {
-      await deleteDoc(doc(db, `users/${userId}/saved_assets`, assetId));
-    } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, docPath);
-    }
-  } else {
-    const list = getLocalAssets().filter((a) => a.id !== assetId);
+  // Update local cache immediately
+  const list = getLocalAssets();
+  const idx = list.findIndex((a) => a.id === assetId);
+  if (idx !== -1) {
+    list[idx] = { ...list[idx], ...preferences, updatedAt: now };
     saveLocalAssets(list);
   }
+
+  // Update Cloud Firestore
+  try {
+    await updateDoc(doc(db, 'shared_assets', assetId), {
+      ...preferences,
+      updatedAt: now,
+    });
+  } catch (error) {
+    console.error('Failed to update asset in Cloud Firestore:', error);
+  }
 }
 
 /**
- * Migrate local assets to cloud when user logs in
+ * Delete a saved signature or stamp from Organization Cloud Firestore
  */
-export async function migrateLocalAssetsToCloud(userId: string): Promise<void> {
-  const localList = getLocalAssets();
-  if (localList.length === 0) return;
+export async function deleteSavedAsset(assetId: string): Promise<void> {
+  // Update local cache
+  const list = getLocalAssets().filter((a) => a.id !== assetId);
+  saveLocalAssets(list);
 
-  for (const asset of localList) {
-    const cloudAsset: SavedAsset = {
-      ...asset,
-      userId,
-      updatedAt: new Date().toISOString(),
-    };
-    try {
-      await setDoc(doc(db, `users/${userId}/saved_assets`, asset.id), cloudAsset);
-    } catch (e) {
-      console.warn('Migration item skipped', e);
-    }
+  // Delete from Cloud Firestore
+  try {
+    await deleteDoc(doc(db, 'shared_assets', assetId));
+  } catch (error) {
+    console.error('Failed to delete asset from Cloud Firestore:', error);
   }
-
-  // Clear local storage after successful migration
-  localStorage.removeItem(LOCAL_STORAGE_KEY);
-  notifyLocalChange();
 }

@@ -1,12 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { User, onAuthStateChanged } from 'firebase/auth';
-import { auth, loginWithGoogle, logout } from './lib/firebase';
 import {
   subscribeToSavedAssets,
   createSavedAsset,
   updateAssetPlacementPreferences,
   deleteSavedAsset,
-  migrateLocalAssetsToCloud,
 } from './services/stampService';
 import { Navbar } from './components/Navbar';
 import { CanvasArea } from './components/CanvasArea';
@@ -17,11 +14,9 @@ import { SignaturePadModal } from './components/SignaturePadModal';
 import { UploadModal } from './components/UploadModal';
 import { TextSignatureModal } from './components/TextSignatureModal';
 import { ExportModal } from './components/ExportModal';
-import { AuthModal } from './components/AuthModal';
 import { Layer, SavedAsset } from './types';
 
 export default function App() {
-  const [user, setUser] = useState<User | null>(null);
   const [savedAssets, setSavedAssets] = useState<SavedAsset[]>([]);
 
   // Base Document State (Only user-uploaded images, no pre-made templates)
@@ -52,28 +47,16 @@ export default function App() {
   const [isUploadOpen, setIsUploadOpen] = useState<boolean>(false);
   const [isTextSignatureOpen, setIsTextSignatureOpen] = useState<boolean>(false);
   const [isExportOpen, setIsExportOpen] = useState<boolean>(false);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Listen to Auth State
+  // Listen to Shared Cloud Assets in Real-Time (No Login Required)
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
-        await migrateLocalAssetsToCloud(currentUser.uid);
-      }
-    });
-    return () => unsub();
-  }, []);
-
-  // Listen to Cloud / Local Saved Assets
-  useEffect(() => {
-    const unsub = subscribeToSavedAssets(user ? user.uid : null, (assets) => {
+    const unsub = subscribeToSavedAssets(null, (assets) => {
       setSavedAssets(assets);
     });
     return () => unsub();
-  }, [user]);
+  }, []);
 
   // Record history
   const pushToHistory = useCallback(
@@ -186,7 +169,6 @@ export default function App() {
         ? rememberedPrefs.relativeY * docH
         : Math.max(20, (docH - targetH) / 2);
 
-    // Keep within bounds
     posX = Math.max(0, Math.min(docW - targetW, posX));
     posY = Math.max(0, Math.min(docH - targetH, posY));
 
@@ -220,7 +202,6 @@ export default function App() {
 
   // Apply a Saved Asset using its remembered placement and size!
   const handleApplySavedAsset = (asset: SavedAsset) => {
-    // If no document uploaded yet, prompt to upload document first
     if (!baseImageUrl) {
       fileInputRef.current?.click();
       return;
@@ -254,7 +235,6 @@ export default function App() {
     const relativeWidth = Math.max(0.05, Math.min(1, layer.width / docW));
 
     if (layer.assetId) {
-      // Update existing asset preferences
       await updateAssetPlacementPreferences(layer.assetId, {
         relativeX,
         relativeY,
@@ -266,7 +246,6 @@ export default function App() {
         blendMode: layer.blendMode,
       });
     } else {
-      // Save as new asset to Cloud/Local library
       const created = await createSavedAsset({
         name: layer.name,
         type: layer.type,
@@ -280,7 +259,6 @@ export default function App() {
         relativeY,
         relativeWidth,
       });
-      // Link layer to the newly created asset
       handleUpdateLayer(layer.id, { assetId: created.id });
     }
   };
@@ -397,13 +375,11 @@ export default function App() {
 
       {/* Main Workspace */}
       <div className="flex-1 flex overflow-hidden relative">
-        {/* Left Saved Assets & Cloud Library Sidebar */}
+        {/* Left Saved Assets & Shared Organization Cloud Library Sidebar */}
         {isLibraryPanelOpen && (
           <aside className="w-72 h-full shrink-0 z-20">
             <SavedAssetsSidebar
               assets={savedAssets}
-              user={user}
-              onOpenAuthModal={() => setIsAuthModalOpen(true)}
               onApplyAsset={handleApplySavedAsset}
               onDeleteAsset={deleteSavedAsset}
               onOpenCreateStamp={() => setIsStampMakerOpen(true)}
@@ -504,13 +480,6 @@ export default function App() {
           baseImageName={baseImageName}
         />
       )}
-
-      <AuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        user={user}
-        savedAssetsCount={savedAssets.length}
-      />
     </div>
   );
 }

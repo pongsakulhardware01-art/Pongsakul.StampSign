@@ -6,26 +6,12 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Helper functions
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    function incoming() {
-      return request.resource.data;
-    }
-
     function isValidId(id) {
       return id is string && id.size() > 0 && id.size() <= 128;
     }
 
-    function isValidSavedAsset(data, userId) {
-      return data.userId == userId
-        && data.name is string && data.name.size() > 0 && data.name.size() <= 100
+    function isValidSharedAsset(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() <= 100
         && data.type in ['signature', 'stamp', 'image']
         && data.imageUrl is string && data.imageUrl.size() > 0
         && data.width is number && data.width > 0
@@ -35,17 +21,18 @@ service cloud.firestore {
         && data.relativeWidth is number && data.relativeWidth > 0 && data.relativeWidth <= 1;
     }
 
-    // User's saved signatures and stamps
+    // Shared Organizational Cloud Assets (No login required for internal company use)
+    match /shared_assets/{assetId} {
+      allow get, list: if true;
+      allow create: if isValidId(assetId) && isValidSharedAsset(request.resource.data);
+      allow update: if isValidId(assetId) && isValidSharedAsset(request.resource.data);
+      allow delete: if isValidId(assetId);
+    }
+
+    // Optional user-scoped assets
     match /users/{userId}/saved_assets/{assetId} {
-      allow get, list: if isOwner(userId);
-      allow create: if isOwner(userId)
-        && isValidId(assetId)
-        && isValidSavedAsset(incoming(), userId);
-      allow update: if isOwner(userId)
-        && isValidId(assetId)
-        && isValidSavedAsset(incoming(), userId)
-        && incoming().userId == resource.data.userId;
-      allow delete: if isOwner(userId) && isValidId(assetId);
+      allow get, list: if request.auth != null && request.auth.uid == userId;
+      allow create, update, delete: if request.auth != null && request.auth.uid == userId && isValidId(assetId);
     }
   }
 }

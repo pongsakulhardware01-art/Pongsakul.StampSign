@@ -24,10 +24,10 @@ export interface Layer {
 
 export interface SavedAsset {
   id: string;
-  userId: string;
   name: string;
   type: 'signature' | 'stamp' | 'image';
   imageUrl: string;
+  department?: string; // e.g. "ฝ่ายบริหาร", "ฝ่ายบัญชี", "ฝ่ายจัดซื้อ", "ส่วนกลาง"
   width: number;
   height: number;
   rotation: number;

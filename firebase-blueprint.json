@@ -1,17 +1,13 @@
 {
   "entities": {
-    "SavedAsset": {
-      "title": "SavedAsset",
-      "description": "User's saved signature or stamp with remembered position and size preferences",
+    "SharedAsset": {
+      "title": "SharedAsset",
+      "description": "Shared organizational signature or stamp with remembered position and size preferences, accessible by team members without login",
       "type": "object",
       "properties": {
         "id": {
           "type": "string",
           "description": "Unique ID of the asset"
-        },
-        "userId": {
-          "type": "string",
-          "description": "Owner user ID"
         },
         "name": {
           "type": "string",
@@ -26,6 +22,11 @@
         "imageUrl": {
           "type": "string",
           "description": "Image data URL of the signature or stamp"
+        },
+        "department": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Department or owner name within organization"
         },
         "width": {
           "type": "number",
@@ -71,13 +72,13 @@
           "description": "Last update timestamp"
         }
       },
-      "required": ["userId", "name", "type", "imageUrl", "width", "height", "relativeX", "relativeY", "relativeWidth"]
+      "required": ["name", "type", "imageUrl", "width", "height", "relativeX", "relativeY", "relativeWidth"]
     }
   },
   "firestore": {
-    "/users/{userId}/saved_assets/{assetId}": {
-      "schema": "SavedAsset",
-      "description": "Collection of personal signatures and stamps for a specific user"
+    "/shared_assets/{assetId}": {
+      "schema": "SharedAsset",
+      "description": "Collection of shared organizational signatures and stamps synced in real-time across company devices"
     }
   }
 }
