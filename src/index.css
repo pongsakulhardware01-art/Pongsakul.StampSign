@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+@layer utilities {
+  .bg-checkerboard {
+    background-image: linear-gradient(45deg, #e2e8f0 25%, transparent 25%),
+      linear-gradient(-45deg, #e2e8f0 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #e2e8f0 75%),
+      linear-gradient(-45deg, transparent 75%, #e2e8f0 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+    background-color: #f8fafc;
+  }
+
+  .bg-checkerboard-light {
+    background-image: linear-gradient(45deg, #e2e8f0 25%, transparent 25%),
+      linear-gradient(-45deg, #e2e8f0 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #e2e8f0 75%),
+      linear-gradient(-45deg, transparent 75%, #e2e8f0 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+    background-color: #f8fafc;
+  }
+}
+
+.font-charm {
+  font-family: 'Charm', cursive;
+}
+
+.font-mali {
+  font-family: 'Mali', cursive;
+}
+
+.font-caveat {
+  font-family: 'Caveat', cursive;
+}
+
+.font-brush {
+  font-family: 'Alex Brush', cursive;
+}
+
+.font-dancing {
+  font-family: 'Dancing Script', cursive;
+}
+
+.font-sarabun {
+  font-family: 'Sarabun', sans-serif;
+}
+
+.font-kanit {
+  font-family: 'Kanit', sans-serif;
+}
+
+.font-prompt {
+  font-family: 'Prompt', sans-serif;
+}

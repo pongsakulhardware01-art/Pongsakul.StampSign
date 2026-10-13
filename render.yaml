@@ -1,0 +1,11 @@
+services:
+  # Option 1: Static Site (Recommended for React SPA - Fast & Free)
+  - type: web
+    name: stampsign-studio
+    runtime: node
+    plan: free
+    buildCommand: npm install --legacy-peer-deps && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20

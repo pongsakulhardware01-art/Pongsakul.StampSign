@@ -1,0 +1,7 @@
+{
+  "name": "StampSign Studio - ประทับตราและเซ็นชื่อบนภาพ",
+  "description": "โปรแกรมแปะตราปั๊มและเซ็นลายเซ็นลงบนภาพ ปรับตำแหน่ง ขนาด หมุนได้อย่างอิสระ พร้อมระบบสร้างตราประทับและวาดลายเซ็นสด",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

@@ -1,0 +1,38 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
+    }
+
+    function isValidSharedAsset(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() <= 100
+        && data.type in ['signature', 'stamp', 'image']
+        && data.imageUrl is string && data.imageUrl.size() > 0
+        && data.width is number && data.width > 0
+        && data.height is number && data.height > 0
+        && data.relativeX is number && data.relativeX >= 0 && data.relativeX <= 1
+        && data.relativeY is number && data.relativeY >= 0 && data.relativeY <= 1
+        && data.relativeWidth is number && data.relativeWidth > 0 && data.relativeWidth <= 1;
+    }
+
+    // Shared Organizational Cloud Assets (No login required for internal company use)
+    match /shared_assets/{assetId} {
+      allow get, list: if true;
+      allow create: if isValidId(assetId) && isValidSharedAsset(request.resource.data);
+      allow update: if isValidId(assetId) && isValidSharedAsset(request.resource.data);
+      allow delete: if isValidId(assetId);
+    }
+
+    // Optional user-scoped assets
+    match /users/{userId}/saved_assets/{assetId} {
+      allow get, list: if request.auth != null && request.auth.uid == userId;
+      allow create, update, delete: if request.auth != null && request.auth.uid == userId && isValidId(assetId);
+    }
+  }
+}
