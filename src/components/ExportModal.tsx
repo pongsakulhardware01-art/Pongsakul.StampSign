@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Download, Copy, Check, X, FileImage, ShieldCheck, Loader2 } from 'lucide-react';
+import { Download, Copy, Check, X, FileText, ShieldCheck, Loader2 } from 'lucide-react';
 import { Layer } from '../types';
 import { compositeFullResolution } from '../utils/imageProcessing';
+import { jsPDF } from 'jspdf';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -18,7 +19,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   layers,
   baseImageName,
 }) => {
-  const [format, setFormat] = useState<'png' | 'jpeg'>('png');
+  const [format, setFormat] = useState<'png' | 'jpeg' | 'pdf'>('pdf');
   const [quality, setQuality] = useState<number>(0.95);
   const [exportDataUrl, setExportDataUrl] = useState<string | null>(null);
   const [dimensions, setDimensions] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
@@ -32,7 +33,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     let isMounted = true;
     setIsGenerating(true);
 
-    compositeFullResolution(baseImageUrl, layers, format, quality)
+    const renderFormat = format === 'pdf' ? 'png' : format;
+
+    compositeFullResolution(baseImageUrl, layers, renderFormat, quality)
       .then((res) => {
         if (!isMounted) return;
         setExportDataUrl(res.dataUrl);
@@ -51,20 +54,48 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     };
   }, [isOpen, baseImageUrl, layers, format, quality]);
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!exportDataUrl) return;
-    const a = document.createElement('a');
-    a.href = exportDataUrl;
-    const ext = format === 'jpeg' ? 'jpg' : 'png';
     const cleanName = baseImageName.replace(/\.[^/.]+$/, '');
-    a.download = `${cleanName}-stamped.${ext}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+
+    if (format === 'pdf') {
+      try {
+        const img = new Image();
+        img.src = exportDataUrl;
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+        });
+
+        const imgWidth = img.naturalWidth || dimensions.width;
+        const imgHeight = img.naturalHeight || dimensions.height;
+        const orientation = imgWidth > imgHeight ? 'l' : 'p';
+
+        const pdf = new jsPDF({
+          orientation,
+          unit: 'px',
+          format: [imgWidth, imgHeight],
+        });
+
+        pdf.addImage(exportDataUrl, 'PNG', 0, 0, imgWidth, imgHeight);
+        pdf.save(`${cleanName}-stamped.pdf`);
+      } catch (err) {
+        console.error('PDF export error:', err);
+        alert('เกิดข้อผิดพลาดในการสร้างไฟล์ PDF');
+      }
+    } else {
+      const a = document.createElement('a');
+      a.href = exportDataUrl;
+      const ext = format === 'jpeg' ? 'jpg' : 'png';
+      a.download = `${cleanName}-stamped.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
   };
 
   const handleCopyToClipboard = async () => {
-    if (!exportDataUrl) return;
+    if (!exportDataUrl || format === 'pdf') return;
     try {
       const res = await fetch(exportDataUrl);
       const blob = await res.blob();
@@ -96,12 +127,12 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         <div className="px-6 py-4 border-b border-zinc-200 flex items-center justify-between bg-zinc-50/70">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center border border-red-200 shadow-2xs">
-              <Download className="w-5 h-5" />
+              <FileText className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-zinc-900">บันทึกและดาวน์โหลดภาพ (Export High-Res)</h2>
+              <h2 className="text-base font-bold text-zinc-900">บันทึกและดาวน์โหลดเอกสาร (Export / Save)</h2>
               <p className="text-xs text-zinc-500">
-                รวมตราปั๊มและลายเซ็นด้วยความละเอียดต้นฉบับสูงสุด 100%
+                รวมตราปั๊มและลายเซ็นลงบนเอกสาร PDF หรือรูปภาพความละเอียดสูง
               </p>
             </div>
           </div>
@@ -120,7 +151,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             {isGenerating ? (
               <div className="flex flex-col items-center gap-3 text-zinc-500">
                 <Loader2 className="w-8 h-8 animate-spin text-red-600" />
-                <span className="text-xs font-semibold">กำลังเรนเดอร์ภาพความละเอียดสูง...</span>
+                <span className="text-xs font-semibold">กำลังรวมตราประทับและลายเซ็น...</span>
               </div>
             ) : exportDataUrl ? (
               <div className="relative max-h-80 w-full flex items-center justify-center">
@@ -139,7 +170,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   ขนาด: {dimensions.width} × {dimensions.height} px
                 </span>
                 <span className="bg-white px-2.5 py-1 rounded-lg border border-zinc-200 font-bold">
-                  ไฟล์: {formatFileSize(fileSizeBytes)}
+                  ขนาดไฟล์: {formatFileSize(fileSizeBytes)}
                 </span>
               </div>
             )}
@@ -149,29 +180,40 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           <div className="md:col-span-5 flex flex-col justify-between gap-5">
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-zinc-700 mb-2">นามสกุลไฟล์ภาพ:</label>
-                <div className="grid grid-cols-2 gap-2">
+                <label className="block text-xs font-bold text-zinc-700 mb-2">รูปแบบไฟล์ที่ต้องการบันทึก:</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => setFormat('pdf')}
+                    className={`p-3 rounded-2xl border text-center transition cursor-pointer ${
+                      format === 'pdf'
+                        ? 'border-red-600 bg-red-50 text-red-700 ring-1 ring-red-400'
+                        : 'border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-zinc-100'
+                    }`}
+                  >
+                    <div className="font-bold text-sm">PDF</div>
+                    <div className="text-[10px] text-zinc-500">เอกสารทางการ</div>
+                  </button>
                   <button
                     onClick={() => setFormat('png')}
-                    className={`p-3 rounded-2xl border text-left transition cursor-pointer ${
+                    className={`p-3 rounded-2xl border text-center transition cursor-pointer ${
                       format === 'png'
                         ? 'border-red-600 bg-red-50 text-red-700 ring-1 ring-red-400'
                         : 'border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-zinc-100'
                     }`}
                   >
                     <div className="font-bold text-sm">PNG</div>
-                    <div className="text-[11px] text-zinc-500">คมชัดสูงสุด ไม่เสียคุณภาพ</div>
+                    <div className="text-[10px] text-zinc-500">คมชัดสูงสุด</div>
                   </button>
                   <button
                     onClick={() => setFormat('jpeg')}
-                    className={`p-3 rounded-2xl border text-left transition cursor-pointer ${
+                    className={`p-3 rounded-2xl border text-center transition cursor-pointer ${
                       format === 'jpeg'
                         ? 'border-red-600 bg-red-50 text-red-700 ring-1 ring-red-400'
                         : 'border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-zinc-100'
                     }`}
                   >
-                    <div className="font-bold text-sm">JPG / JPEG</div>
-                    <div className="text-[11px] text-zinc-500">ไฟล์เล็ก เหมาะส่งไลน์/อีเมล</div>
+                    <div className="font-bold text-sm">JPG</div>
+                    <div className="text-[10px] text-zinc-500">ไฟล์ขนาดเล็ก</div>
                   </button>
                 </div>
               </div>
@@ -197,7 +239,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               <div className="bg-red-50/60 p-3 rounded-2xl border border-red-100 flex items-start gap-2.5">
                 <ShieldCheck className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
                 <div className="text-[11px] text-zinc-600 leading-relaxed">
-                  <span className="font-bold text-zinc-900">ความปลอดภัยสูงสุด:</span> การประมวลผลทำบนเบราว์เซอร์ของคุณโดยตรง เอกสารสำคัญจะไม่ถูกส่งไปยังเซิร์ฟเวอร์ภายนอก
+                  <span className="font-bold text-zinc-900">ประมวลผลภายในองค์กร:</span> ข้อมูลทั้งหมดประมวลผลบนเครื่องของคุณ ปลอดภัย 100%
                 </div>
               </div>
             </div>
@@ -210,26 +252,28 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 className="w-full py-3 px-4 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 shadow-md shadow-red-600/25 flex items-center justify-center gap-2 transition disabled:opacity-50 active:scale-98 cursor-pointer"
               >
                 <Download className="w-4 h-4" />
-                ดาวน์โหลดรูปภาพ ({format.toUpperCase()})
+                ดาวน์โหลดไฟล์ {format.toUpperCase()}
               </button>
 
-              <button
-                onClick={handleCopyToClipboard}
-                disabled={isGenerating || !exportDataUrl}
-                className="w-full py-2.5 px-4 rounded-xl font-bold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 flex items-center justify-center gap-2 transition disabled:opacity-50 cursor-pointer"
-              >
-                {copied ? (
-                  <>
-                    <Check className="w-4 h-4 text-emerald-600" />
-                    <span className="text-emerald-700">คัดลอกลงคลิปบอร์ดแล้ว!</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-4 h-4" />
-                    คัดลอกภาพไปยังคลิปบอร์ด
-                  </>
-                )}
-              </button>
+              {format !== 'pdf' && (
+                <button
+                  onClick={handleCopyToClipboard}
+                  disabled={isGenerating || !exportDataUrl}
+                  className="w-full py-2.5 px-4 rounded-xl font-bold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 flex items-center justify-center gap-2 transition disabled:opacity-50 cursor-pointer"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="w-4 h-4 text-emerald-600" />
+                      <span className="text-emerald-700">คัดลอกลงคลิปบอร์ดแล้ว!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      คัดลอกภาพไปยังคลิปบอร์ด
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>

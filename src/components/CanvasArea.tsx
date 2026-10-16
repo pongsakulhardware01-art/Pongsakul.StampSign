@@ -31,6 +31,9 @@ interface CanvasAreaProps {
   setZoom: React.Dispatch<React.SetStateAction<number>>;
   pan: { x: number; y: number };
   setPan: React.Dispatch<React.SetStateAction<{ x: number; y: number }>>;
+  pdfCurrentPage?: number;
+  pdfTotalPages?: number;
+  onSwitchPdfPage?: (page: number) => void;
 }
 
 type DragMode =
@@ -62,6 +65,9 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
   setZoom,
   pan,
   setPan,
+  pdfCurrentPage = 1,
+  pdfTotalPages = 1,
+  onSwitchPdfPage,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [dragMode, setDragMode] = useState<DragMode>('none');
@@ -101,46 +107,14 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
-        return;
-      }
-
-      if (e.code === 'Space') {
+      if (e.code === 'Space' && !isSpacePressed && (e.target as HTMLElement).tagName !== 'INPUT') {
         setIsSpacePressed(true);
       }
-
-      if (!selectedLayer || selectedLayer.locked) return;
-
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        e.preventDefault();
-        onDeleteLayer(selectedLayer.id);
-        return;
-      }
-
-      if (e.key === 'Escape') {
-        onSelectLayer(null);
-        return;
-      }
-
-      const step = e.shiftKey ? 10 : 1;
-      if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        onUpdateLayer(selectedLayer.id, { x: selectedLayer.x - step });
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        onUpdateLayer(selectedLayer.id, { x: selectedLayer.x + step });
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        onUpdateLayer(selectedLayer.id, { y: selectedLayer.y - step });
-      } else if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        onUpdateLayer(selectedLayer.id, { y: selectedLayer.y + step });
-      }
     };
-
     const handleKeyUp = (e: KeyboardEvent) => {
       if (e.code === 'Space') {
         setIsSpacePressed(false);
+        setDragMode('none');
       }
     };
 
@@ -150,42 +124,30 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedLayer, onDeleteLayer, onUpdateLayer, onSelectLayer]);
+  }, [isSpacePressed]);
 
+  // Handle Wheel zoom
   const handleWheel = (e: React.WheelEvent) => {
-    if (e.ctrlKey || e.metaKey || !isSpacePressed) {
-      e.preventDefault();
-      const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
-      setZoom((prev) => Math.min(4, Math.max(0.15, prev * zoomFactor)));
-    } else {
-      setPan((prev) => ({
-        x: prev.x - e.deltaX,
-        y: prev.y - e.deltaY,
-      }));
-    }
+    e.preventDefault();
+    const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+    setZoom((prevZoom) => Math.min(3, Math.max(0.15, prevZoom * zoomFactor)));
   };
 
-  const handlePointerDownBackground = (e: React.PointerEvent) => {
-    if (e.button === 1 || isSpacePressed || e.target === containerRef.current) {
+  const handlePointerDownCanvas = (e: React.PointerEvent) => {
+    if (e.button === 1 || isSpacePressed || (e.target === containerRef.current)) {
       setDragMode('pan');
-      dragStartRef.current = {
-        ...dragStartRef.current,
-        clientX: e.clientX,
-        clientY: e.clientY,
-        panX: pan.x,
-        panY: pan.y,
-      };
+      dragStartRef.current.clientX = e.clientX;
+      dragStartRef.current.clientY = e.clientY;
+      dragStartRef.current.panX = pan.x;
+      dragStartRef.current.panY = pan.y;
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    } else {
-      onSelectLayer(null);
+      if (e.target === containerRef.current && !isSpacePressed && e.button !== 1) {
+        onSelectLayer(null);
+      }
     }
   };
 
-  const handlePointerDownLayer = (
-    e: React.PointerEvent,
-    layer: Layer,
-    mode: DragMode
-  ) => {
+  const handlePointerDownLayer = (e: React.PointerEvent, layer: Layer, mode: DragMode) => {
     e.stopPropagation();
     onSelectLayer(layer.id);
 
@@ -250,90 +212,56 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
         newY = centerY - selectedLayer.height / 2;
       }
 
-      onUpdateLayer(selectedLayer.id, { x: newX, y: newY });
-      return;
-    }
+      onUpdateLayer(selectedLayer.id, {
+        x: Math.round(newX),
+        y: Math.round(newY),
+      });
+    } else if (dragMode.startsWith('resize-')) {
+      const startW = dragStartRef.current.layerW;
+      const startH = dragStartRef.current.layerH;
+      const startX = dragStartRef.current.layerX;
+      const startY = dragStartRef.current.layerY;
+      const aspect = dragStartRef.current.aspectRatio;
 
-    if (dragMode === 'rotate') {
-      const containerRect = containerRef.current?.getBoundingClientRect();
-      if (!containerRect) return;
+      let newW = startW;
+      let newH = startH;
+      let newX = startX;
+      let newY = startY;
 
-      const centerScreenX =
-        containerRect.left +
-        containerRect.width / 2 +
-        pan.x +
-        (dragStartRef.current.centerX - baseImageDimensions.width / 2) * zoom;
-      const centerScreenY =
-        containerRect.top +
-        containerRect.height / 2 +
-        pan.y +
-        (dragStartRef.current.centerY - baseImageDimensions.height / 2) * zoom;
-
-      const angleRad = Math.atan2(e.clientY - centerScreenY, e.clientX - centerScreenX);
-      let angleDeg = (angleRad * 180) / Math.PI - 90;
-
-      while (angleDeg > 180) angleDeg -= 360;
-      while (angleDeg < -180) angleDeg += 360;
-
-      const snapAngles = [0, 45, 90, 135, 180, -45, -90, -135];
-      for (const snap of snapAngles) {
-        if (Math.abs(angleDeg - snap) < 4) {
-          angleDeg = snap;
-          break;
-        }
+      if (dragMode === 'resize-se') {
+        newW = Math.max(40, startW + dx);
+        newH = newW / aspect;
+      } else if (dragMode === 'resize-sw') {
+        newW = Math.max(40, startW - dx);
+        newH = newW / aspect;
+        newX = startX + (startW - newW);
+      } else if (dragMode === 'resize-ne') {
+        newW = Math.max(40, startW + dx);
+        newH = newW / aspect;
+        newY = startY + (startH - newH);
+      } else if (dragMode === 'resize-nw') {
+        newW = Math.max(40, startW - dx);
+        newH = newW / aspect;
+        newX = startX + (startW - newW);
+        newY = startY + (startH - newH);
+      } else if (dragMode === 'resize-e') {
+        newW = Math.max(40, startW + dx);
+      } else if (dragMode === 'resize-w') {
+        newW = Math.max(40, startW - dx);
+        newX = startX + (startW - newW);
+      } else if (dragMode === 'resize-s') {
+        newH = Math.max(40, startH + dy);
+      } else if (dragMode === 'resize-n') {
+        newH = Math.max(40, startH - dy);
+        newY = startY + (startH - newH);
       }
 
-      onUpdateLayer(selectedLayer.id, { rotation: Math.round(angleDeg) });
-      return;
-    }
-
-    const startW = dragStartRef.current.layerW;
-    const startH = dragStartRef.current.layerH;
-    const startX = dragStartRef.current.layerX;
-    const startY = dragStartRef.current.layerY;
-    const aspect = dragStartRef.current.aspectRatio;
-
-    if (dragMode === 'resize-se') {
-      const newW = Math.max(30, startW + dx);
-      const newH = newW / aspect;
-      onUpdateLayer(selectedLayer.id, { width: newW, height: newH });
-    } else if (dragMode === 'resize-sw') {
-      const newW = Math.max(30, startW - dx);
-      const newH = newW / aspect;
       onUpdateLayer(selectedLayer.id, {
-        width: newW,
-        height: newH,
-        x: startX + (startW - newW),
+        width: Math.round(newW),
+        height: Math.round(newH),
+        x: Math.round(newX),
+        y: Math.round(newY),
       });
-    } else if (dragMode === 'resize-ne') {
-      const newW = Math.max(30, startW + dx);
-      const newH = newW / aspect;
-      onUpdateLayer(selectedLayer.id, {
-        width: newW,
-        height: newH,
-        y: startY + (startH - newH),
-      });
-    } else if (dragMode === 'resize-nw') {
-      const newW = Math.max(30, startW - dx);
-      const newH = newW / aspect;
-      onUpdateLayer(selectedLayer.id, {
-        width: newW,
-        height: newH,
-        x: startX + (startW - newW),
-        y: startY + (startH - newH),
-      });
-    } else if (dragMode === 'resize-e') {
-      const newW = Math.max(30, startW + dx);
-      onUpdateLayer(selectedLayer.id, { width: newW });
-    } else if (dragMode === 'resize-w') {
-      const newW = Math.max(30, startW - dx);
-      onUpdateLayer(selectedLayer.id, { width: newW, x: startX + (startW - newW) });
-    } else if (dragMode === 'resize-s') {
-      const newH = Math.max(30, startH + dy);
-      onUpdateLayer(selectedLayer.id, { height: newH });
-    } else if (dragMode === 'resize-n') {
-      const newH = Math.max(30, startH - dy);
-      onUpdateLayer(selectedLayer.id, { height: newH, y: startY + (startH - newH) });
     }
   };
 
@@ -342,52 +270,41 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
       setDragMode('none');
       try {
         (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-      } catch (err) {
-        // ignore
+      } catch {
+        // Ignore if already released
       }
     }
   };
 
-  const rotateBy = (deg: number) => {
-    if (!selectedLayer || selectedLayer.locked) return;
-    const current = selectedLayer.rotation || 0;
-    let next = (current + deg) % 360;
-    if (next > 180) next -= 360;
-    if (next < -180) next += 360;
-    onUpdateLayer(selectedLayer.id, { rotation: next });
+  const rotateBy = (angleDelta: number) => {
+    if (!selectedLayer) return;
+    const currentRot = selectedLayer.rotation || 0;
+    const nextRot = (currentRot + angleDelta + 360) % 360;
+    onUpdateLayer(selectedLayer.id, { rotation: nextRot });
   };
 
   const handleTriggerSavePlacement = () => {
     if (!selectedLayer) return;
     onSaveLayerPlacement(selectedLayer);
     setSavedFeedback(true);
-    setTimeout(() => setSavedFeedback(false), 2200);
+    setTimeout(() => setSavedFeedback(false), 2000);
   };
 
   return (
     <div
       ref={containerRef}
       onWheel={handleWheel}
-      onPointerDown={handlePointerDownBackground}
+      onPointerDown={handlePointerDownCanvas}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      className={`relative w-full h-full overflow-hidden select-none bg-zinc-100 flex items-center justify-center ${
+      className={`relative w-full h-full overflow-hidden flex items-center justify-center select-none bg-zinc-100 ${
         isSpacePressed || dragMode === 'pan' ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'
       }`}
     >
-      {/* Background dot pattern */}
-      <div
-        className="absolute inset-0 pointer-events-none opacity-40"
-        style={{
-          backgroundImage: 'radial-gradient(circle, #cbd5e1 1.2px, transparent 1.2px)',
-          backgroundSize: '24px 24px',
-        }}
-      />
-
-      {/* Viewport Zoom Controls */}
-      <div className="absolute bottom-5 right-5 z-30 flex items-center gap-1.5 bg-white/95 backdrop-blur-md border border-zinc-200/90 p-1.5 rounded-2xl shadow-lg">
+      {/* Zoom Toolbar overlay */}
+      <div className="absolute bottom-5 right-5 z-30 bg-white/90 backdrop-blur-md border border-zinc-200 p-1.5 rounded-2xl shadow-xl flex items-center gap-1 text-zinc-800">
         <button
-          onClick={() => setZoom((z) => Math.max(0.2, z * 0.85))}
+          onClick={() => setZoom((z) => Math.max(0.15, z / 1.15))}
           className="p-1.5 text-zinc-600 hover:text-red-600 hover:bg-zinc-100 rounded-xl transition cursor-pointer"
           title="ย่อขนาด"
         >
@@ -395,11 +312,11 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
         </button>
         <button
           onClick={() => {
-            setZoom(1);
+            setZoom(0.75);
             setPan({ x: 0, y: 0 });
           }}
           className="px-2 py-1 text-xs font-mono font-bold text-zinc-700 hover:bg-zinc-100 rounded-xl transition cursor-pointer"
-          title="รีเซ็ตเป็น 100%"
+          title="รีเซ็ตเป็น 75%"
         >
           {Math.round(zoom * 100)}%
         </button>
@@ -431,6 +348,30 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
         </button>
       </div>
 
+      {/* PDF Page Pagination Toolbar */}
+      {pdfTotalPages > 1 && (
+        <div className="absolute bottom-5 left-5 z-30 bg-white/95 backdrop-blur-md border border-zinc-200 px-3 py-2 rounded-2xl shadow-xl flex items-center gap-3 text-zinc-800">
+          <span className="text-xs font-bold text-zinc-700">หน้า PDF:</span>
+          <button
+            onClick={() => onSwitchPdfPage && onSwitchPdfPage(pdfCurrentPage - 1)}
+            disabled={pdfCurrentPage <= 1}
+            className="px-2.5 py-1 rounded-xl text-xs font-bold bg-zinc-100 hover:bg-zinc-200 disabled:opacity-30 cursor-pointer transition"
+          >
+            ก่อนหน้า
+          </button>
+          <span className="text-xs font-mono font-bold text-red-600">
+            {pdfCurrentPage} / {pdfTotalPages}
+          </span>
+          <button
+            onClick={() => onSwitchPdfPage && onSwitchPdfPage(pdfCurrentPage + 1)}
+            disabled={pdfCurrentPage >= pdfTotalPages}
+            className="px-2.5 py-1 rounded-xl text-xs font-bold bg-zinc-100 hover:bg-zinc-200 disabled:opacity-30 cursor-pointer transition"
+          >
+            ถัดไป
+          </button>
+        </div>
+      )}
+
       {/* Transform Container or Empty State */}
       {baseImageUrl ? (
         <div
@@ -446,7 +387,7 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
             src={baseImageUrl}
             alt="Uploaded Base Document"
             draggable={false}
-            className="w-full h-full block object-contain select-none shadow-2xl border border-zinc-300"
+            className="w-full h-full block object-contain select-none shadow-2xl border border-zinc-300 bg-white"
           />
 
           {layers.map((layer) => {
@@ -483,42 +424,34 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
                     src={layer.imageUrl}
                     alt={layer.name}
                     draggable={false}
-                    className="w-full h-full object-contain pointer-events-none select-none"
+                    className="w-full h-full object-contain pointer-events-none drop-shadow-md"
                   />
                 </div>
 
+                {/* Selection Border & Resize Handles */}
                 {isSelected && !layer.locked && (
                   <>
-                    <div className="absolute inset-0 border-2 border-red-600 pointer-events-none ring-2 ring-red-600/20" />
-
-                    <div
-                      onPointerDown={(e) => handlePointerDownLayer(e, layer, 'rotate')}
-                      className="absolute -top-9 left-1/2 -translate-x-1/2 flex flex-col items-center cursor-grab active:cursor-grabbing"
-                      title="ลากเพื่อหมุน"
-                    >
-                      <div className="w-5 h-5 rounded-full bg-red-600 border-2 border-white shadow-md flex items-center justify-center hover:scale-125 transition">
-                        <RotateCw className="w-2.5 h-2.5 text-white" />
-                      </div>
-                      <div className="w-0.5 h-4 bg-red-600" />
-                    </div>
-
+                    <div className="absolute inset-0 border-2 border-red-600 bg-red-600/5 pointer-events-none rounded-xs" />
+                    
+                    {/* Corner Resize Handles */}
                     <div
                       onPointerDown={(e) => handlePointerDownLayer(e, layer, 'resize-nw')}
-                      className="absolute -top-2 -left-2 w-4 h-4 bg-white border-2 border-red-600 rounded-sm cursor-nwse-resize shadow-md hover:scale-125 transition"
+                      className="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 bg-white border-2 border-red-600 rounded-full cursor-nwse-resize shadow"
                     />
                     <div
                       onPointerDown={(e) => handlePointerDownLayer(e, layer, 'resize-ne')}
-                      className="absolute -top-2 -right-2 w-4 h-4 bg-white border-2 border-red-600 rounded-sm cursor-nesw-resize shadow-md hover:scale-125 transition"
+                      className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-white border-2 border-red-600 rounded-full cursor-nesw-resize shadow"
                     />
                     <div
                       onPointerDown={(e) => handlePointerDownLayer(e, layer, 'resize-se')}
-                      className="absolute -bottom-2 -right-2 w-4 h-4 bg-white border-2 border-red-600 rounded-sm cursor-nwse-resize shadow-md hover:scale-125 transition"
+                      className="absolute -bottom-1.5 -right-1.5 w-3.5 h-3.5 bg-white border-2 border-red-600 rounded-full cursor-nwse-resize shadow"
                     />
                     <div
                       onPointerDown={(e) => handlePointerDownLayer(e, layer, 'resize-sw')}
-                      className="absolute -bottom-2 -left-2 w-4 h-4 bg-white border-2 border-red-600 rounded-sm cursor-nesw-resize shadow-md hover:scale-125 transition"
+                      className="absolute -bottom-1.5 -left-1.5 w-3.5 h-3.5 bg-white border-2 border-red-600 rounded-full cursor-nesw-resize shadow"
                     />
 
+                    {/* Edge Resize Handles */}
                     <div
                       onPointerDown={(e) => handlePointerDownLayer(e, layer, 'resize-n')}
                       className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-2 border-red-600 rounded-sm cursor-ns-resize shadow"
@@ -559,13 +492,13 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
             <Upload className="w-10 h-10" />
           </div>
           <h3 className="text-lg font-bold text-zinc-900 mb-2">
-            อัปโหลดรูปภาพที่ต้องการประทับตราหรือเซ็นชื่อ
+            อัปโหลดเอกสาร PDF หรือรูปภาพที่ต้องการประทับตรา / เซ็นชื่อ
           </h3>
           <p className="text-xs text-zinc-500 leading-relaxed mb-4 max-w-xs">
-            คลิกที่นี่ หรือลากไฟล์ภาพ (JPG, PNG, WEBP) มาวางบนหน้าจอ
+            คลิกที่นี่ หรือลากไฟล์ PDF หรือภาพ (JPG, PNG) มาวางบนหน้าจอเพื่อเริ่มแก้ไข
           </p>
           <span className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-red-600 group-hover:bg-red-700 shadow-md shadow-red-600/25 transition">
-            เลือกไฟล์รูปภาพจากเครื่อง
+            เลือกไฟล์จากเครื่อง
           </span>
         </div>
       )}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Stamp, Sparkles, Sliders, Check, X, RefreshCw, BookmarkCheck } from 'lucide-react';
+import { Stamp, Sparkles, Sliders, Check, X, BookmarkCheck } from 'lucide-react';
 import { StampConfig } from '../types';
 import { generateStampDataUrl } from '../utils/stampGenerator';
 
@@ -42,7 +42,7 @@ export const StampMakerModal: React.FC<StampMakerModalProps> = ({
         dateText: todayFormatted,
         color: '#dc2626',
         hasGrunge: true,
-        grungeIntensity: 0.4,
+        grungeIntensity: 0.35,
         borderWidth: 8,
         doubleBorder: true,
         starOrnaments: true,
@@ -60,7 +60,7 @@ export const StampMakerModal: React.FC<StampMakerModalProps> = ({
         dateText: todayFormatted,
         color: '#dc2626',
         hasGrunge: true,
-        grungeIntensity: 0.35,
+        grungeIntensity: 0.3,
         borderWidth: 6,
         doubleBorder: true,
         starOrnaments: false,
@@ -78,7 +78,7 @@ export const StampMakerModal: React.FC<StampMakerModalProps> = ({
         dateText: todayFormatted,
         color: '#dc2626',
         hasGrunge: true,
-        grungeIntensity: 0.4,
+        grungeIntensity: 0.35,
         borderWidth: 7,
         doubleBorder: true,
         starOrnaments: false,
@@ -114,7 +114,7 @@ export const StampMakerModal: React.FC<StampMakerModalProps> = ({
         dateText: '',
         color: '#dc2626',
         hasGrunge: true,
-        grungeIntensity: 0.45,
+        grungeIntensity: 0.4,
         borderWidth: 8,
         doubleBorder: true,
         starOrnaments: false,
@@ -163,7 +163,7 @@ export const StampMakerModal: React.FC<StampMakerModalProps> = ({
   const [previewUrl, setPreviewUrl] = useState<string>('');
 
   const colors = [
-    { label: 'แดงชาด (ยอดนิยม)', value: '#dc2626' },
+    { label: 'แดงชาด', value: '#dc2626' },
     { label: 'แดงเลือดหมู', value: '#991b1b' },
     { label: 'น้ำเงินทางการ', value: '#1e40af' },
     { label: 'ดำมาตรฐาน', value: '#18181b' },
@@ -207,7 +207,7 @@ export const StampMakerModal: React.FC<StampMakerModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-bold text-zinc-900">ตราประทับยาง / ตราปั๊ม (Rubber Stamp Maker)</h2>
-              <p className="text-xs text-zinc-500">สร้างตราวงกลมบริษัท หรือสี่เหลี่ยมทางการ พร้อมเอฟเฟกต์หมึกยางจริง</p>
+              <p className="text-xs text-zinc-500">ปรับแต่งรูปทรง ขอบ เส้นผ่านศูนย์กลาง และรอยปั๊มหมึกได้อย่างยืดหยุ่น</p>
             </div>
           </div>
           <button
@@ -240,7 +240,7 @@ export const StampMakerModal: React.FC<StampMakerModalProps> = ({
             }`}
           >
             <Sparkles className="w-4 h-4 text-red-500" />
-            ตราประทับตัวอย่างยอดนิยม
+            ตราประทับยอดนิยม (Templates)
           </button>
         </div>
 
@@ -274,14 +274,14 @@ export const StampMakerModal: React.FC<StampMakerModalProps> = ({
                 ))}
               </div>
             ) : (
-              <div className="flex flex-col gap-4 text-sm">
+              <div className="flex flex-col gap-3.5 text-sm">
                 <div>
                   <label className="block text-xs font-bold text-zinc-700 mb-1.5">รูปทรงตราปั๊ม:</label>
                   <div className="grid grid-cols-4 gap-2">
                     {[
                       { id: 'circle', label: 'วงกลม' },
                       { id: 'rounded-rect', label: 'สี่เหลี่ยมมน' },
-                      { id: 'rect', label: 'สี่เหลี่ยมมุมฉาก' },
+                      { id: 'rect', label: 'สี่เหลี่ยม' },
                       { id: 'date-badge', label: 'กล่องวันที่' },
                     ].map((s) => (
                       <button
@@ -353,85 +353,156 @@ export const StampMakerModal: React.FC<StampMakerModalProps> = ({
                         type="text"
                         value={customConfig.subtitle || ''}
                         onChange={(e) => setCustomConfig({ ...customConfig, subtitle: e.target.value })}
-                        placeholder="เช่น ใช้สำหรับติดต่องานเท่านั้น"
+                        placeholder="เช่น สำเนาถูกต้อง / PAID"
                         className="w-full bg-white border border-zinc-300 rounded-xl px-3 py-2 text-zinc-900 text-xs focus:outline-none focus:border-red-500"
                       />
                     </div>
                   )}
 
                   <div>
-                    <label className="block text-xs font-bold text-zinc-700 mb-1">วันที่ (Date):</label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={customConfig.dateText || ''}
-                        onChange={(e) => setCustomConfig({ ...customConfig, dateText: e.target.value })}
-                        placeholder="เช่น 12 ต.ค. 2569"
-                        className="flex-1 bg-white border border-zinc-300 rounded-xl px-3 py-2 text-zinc-900 text-xs focus:outline-none focus:border-red-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setCustomConfig({ ...customConfig, dateText: todayFormatted })}
-                        className="px-3 py-2 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 rounded-xl text-xs font-semibold text-zinc-700 cursor-pointer"
-                      >
-                        วันนี้
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-zinc-700 mb-1.5">สีน้ำหมึก:</label>
-                  <div className="flex items-center gap-2">
-                    {colors.map((c) => (
-                      <button
-                        key={c.value}
-                        type="button"
-                        onClick={() => setCustomConfig({ ...customConfig, color: c.value })}
-                        title={c.label}
-                        className={`w-7 h-7 rounded-full border-2 transition-all cursor-pointer ${
-                          customConfig.color === c.value
-                            ? 'border-white scale-110 shadow-md ring-2 ring-red-500'
-                            : 'border-transparent hover:scale-105 opacity-80'
-                        }`}
-                        style={{ backgroundColor: c.value }}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                <div className="bg-zinc-50 p-3 rounded-2xl border border-zinc-200 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-zinc-700">เอฟเฟกต์หมึกปั๊มยางจริง:</span>
+                    <label className="block text-xs font-bold text-zinc-700 mb-1">แสดงวันที่บนตราประทับ:</label>
                     <input
-                      type="checkbox"
-                      checked={customConfig.hasGrunge}
-                      onChange={(e) => setCustomConfig({ ...customConfig, hasGrunge: e.target.checked })}
-                      className="rounded accent-red-600 w-4 h-4 cursor-pointer"
+                      type="text"
+                      value={customConfig.dateText || ''}
+                      onChange={(e) => setCustomConfig({ ...customConfig, dateText: e.target.value })}
+                      placeholder="เช่น 16 ต.ค. 2569"
+                      className="w-full bg-white border border-zinc-300 rounded-xl px-3 py-2 text-zinc-900 text-xs focus:outline-none focus:border-red-500"
                     />
+                  </div>
+
+                  {/* Advanced Flexibility Sliders (Border Width & Vintage Grunge) */}
+                  <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-3.5 space-y-3">
+                    <div className="flex items-center gap-2 text-xs font-bold text-zinc-800">
+                      <Sliders className="w-3.5 h-3.5 text-red-600" />
+                      <span>ปรับแต่งความหนาและรอยหมึกยาง (Flexibility)</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <div className="flex justify-between text-[11px] font-semibold text-zinc-600 mb-1">
+                          <span>ความหนาขอบ:</span>
+                          <span className="font-mono text-red-600">{customConfig.borderWidth}px</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="4"
+                          max="16"
+                          value={customConfig.borderWidth}
+                          onChange={(e) =>
+                            setCustomConfig({ ...customConfig, borderWidth: Number(e.target.value) })
+                          }
+                          className="w-full accent-red-600 cursor-pointer"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between text-[11px] font-semibold text-zinc-600 mb-1">
+                          <span>รอยหมึกเสื่อม (Grunge):</span>
+                          <span className="font-mono text-red-600">
+                            {Math.round(customConfig.grungeIntensity * 100)}%
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="0.7"
+                          step="0.05"
+                          value={customConfig.grungeIntensity}
+                          onChange={(e) =>
+                            setCustomConfig({
+                              ...customConfig,
+                              grungeIntensity: Number(e.target.value),
+                              hasGrunge: Number(e.target.value) > 0,
+                            })
+                          }
+                          className="w-full accent-red-600 cursor-pointer"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4 pt-1">
+                      <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-zinc-700">
+                        <input
+                          type="checkbox"
+                          checked={customConfig.doubleBorder}
+                          onChange={(e) =>
+                            setCustomConfig({ ...customConfig, doubleBorder: e.target.checked })
+                          }
+                          className="rounded accent-red-600 w-4 h-4 cursor-pointer"
+                        />
+                        <span>ขอบคู่ (Double Border)</span>
+                      </label>
+
+                      {customConfig.shape === 'circle' && (
+                        <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-zinc-700">
+                          <input
+                            type="checkbox"
+                            checked={customConfig.starOrnaments}
+                            onChange={(e) =>
+                              setCustomConfig({ ...customConfig, starOrnaments: e.target.checked })
+                            }
+                            className="rounded accent-red-600 w-4 h-4 cursor-pointer"
+                          />
+                          <span>ประดับดาวข้าง</span>
+                        </label>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Right Preview */}
-          <div className="md:col-span-5 flex flex-col items-center justify-center bg-zinc-50/70 rounded-3xl border border-zinc-200 p-6">
-            <span className="text-xs font-bold text-zinc-600 mb-3 self-start">ตัวอย่างผลลัพธ์:</span>
-            <div className="w-60 h-60 rounded-2xl border-2 border-dashed border-zinc-300 bg-white shadow-sm flex items-center justify-center p-4 relative overflow-hidden">
-              {previewUrl ? (
+          {/* Right Live Preview */}
+          <div className="md:col-span-5 flex flex-col items-center justify-center bg-zinc-50 border border-zinc-200 rounded-3xl p-6 relative">
+            <span className="absolute top-4 left-4 text-xs font-bold text-zinc-500">
+              ตัวอย่างตราประทับ:
+            </span>
+            <div className="w-64 h-64 bg-checkerboard rounded-2xl border border-zinc-200 flex items-center justify-center p-4 shadow-inner mt-4">
+              {previewUrl && (
                 <img
                   src={previewUrl}
                   alt="Stamp Preview"
-                  className="max-w-full max-h-full object-contain filter drop-shadow-xs select-none"
+                  className="max-h-full max-w-full object-contain filter drop-shadow-md select-none"
                 />
-              ) : (
-                <RefreshCw className="w-6 h-6 text-zinc-400 animate-spin" />
               )}
             </div>
 
-            <div className="mt-4 w-full bg-white p-2.5 rounded-2xl border border-zinc-200 flex items-center justify-between shadow-2xs">
-              <label className="flex items-center gap-2 cursor-pointer text-xs text-red-700 font-bold">
+            {/* Color selection */}
+            <div className="mt-5 w-full flex items-center justify-between">
+              <span className="text-xs font-bold text-zinc-700">สีหมึกประทับ:</span>
+              <div className="flex items-center gap-2">
+                {colors.map((c) => (
+                  <button
+                    key={c.value}
+                    type="button"
+                    onClick={() => {
+                      if (activeTab === 'custom') {
+                        setCustomConfig({ ...customConfig, color: c.value });
+                      } else {
+                        // For presets, we can clone and modify color
+                        const target = presets.find((p) => p.id === selectedPresetId);
+                        if (target) {
+                          target.config.color = c.value;
+                          setCustomConfig({ ...target.config, color: c.value });
+                          setActiveTab('custom');
+                        }
+                      }
+                    }}
+                    className={`w-7 h-7 rounded-full border-2 transition cursor-pointer ${
+                      activeConfig.color === c.value
+                        ? 'border-white scale-110 shadow-md ring-2 ring-red-500'
+                        : 'border-transparent opacity-80'
+                    }`}
+                    style={{ backgroundColor: c.value }}
+                    title={c.label}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-4 w-full pt-3 border-t border-zinc-200">
+              <label className="flex items-center justify-center gap-2 cursor-pointer text-xs text-red-700 font-bold">
                 <input
                   type="checkbox"
                   checked={saveToLibrary}
@@ -439,7 +510,7 @@ export const StampMakerModal: React.FC<StampMakerModalProps> = ({
                   className="rounded accent-red-600 w-4 h-4 cursor-pointer"
                 />
                 <BookmarkCheck className="w-4 h-4 text-red-600" />
-                บันทึกลงคลังคลาวด์ไว้ใช้ซ้ำ
+                <span>บันทึกลงคลังคลาวด์องค์กรอัตโนมัติ</span>
               </label>
             </div>
           </div>
@@ -455,10 +526,11 @@ export const StampMakerModal: React.FC<StampMakerModalProps> = ({
           </button>
           <button
             onClick={handleApply}
-            className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold text-white bg-red-600 hover:bg-red-700 shadow-md shadow-red-600/25 transition active:scale-95 cursor-pointer"
+            disabled={!previewUrl}
+            className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold text-white bg-red-600 hover:bg-red-700 shadow-md shadow-red-600/25 disabled:opacity-40 disabled:cursor-not-allowed transition active:scale-95 cursor-pointer"
           >
             <Check className="w-4 h-4" />
-            เพิ่มตราปั๊มนี้ลงบนภาพ
+            นำไปประทับลงภาพ
           </button>
         </div>
       </div>

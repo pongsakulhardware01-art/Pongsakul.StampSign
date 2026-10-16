@@ -16,6 +16,7 @@ import { TextSignatureModal } from './components/TextSignatureModal';
 import { ExportModal } from './components/ExportModal';
 import { ClearConfirmModal } from './components/ClearConfirmModal';
 import { Layer, SavedAsset } from './types';
+import { loadPdfDocument, renderPdfPageToDataUrl } from './utils/pdfParser';
 
 export default function App() {
   const [savedAssets, setSavedAssets] = useState<SavedAsset[]>([]);
@@ -27,6 +28,11 @@ export default function App() {
     width: 1200,
     height: 800,
   });
+
+  // PDF state
+  const [pdfDocProxy, setPdfDocProxy] = useState<any | null>(null);
+  const [pdfCurrentPage, setPdfCurrentPage] = useState<number>(1);
+  const [pdfTotalPages, setPdfTotalPages] = useState<number>(1);
 
   const [layers, setLayers] = useState<Layer[]>([]);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
@@ -125,25 +131,60 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, [handleUndo, handleRedo]);
 
-  // Base Image Upload handler
-  const handleUploadBaseImage = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const url = e.target?.result as string;
-      const img = new Image();
-      img.onload = () => {
-        const w = img.naturalWidth || img.width;
-        const h = img.naturalHeight || img.height;
-        setBaseImageUrl(url);
+  // Base Image or PDF Upload handler
+  const handleUploadBaseImage = async (file: File) => {
+    if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+      try {
+        const { numPages, pdfDoc } = await loadPdfDocument(file);
+        setPdfDocProxy(pdfDoc);
+        setPdfTotalPages(numPages);
+        setPdfCurrentPage(1);
         setBaseImageName(file.name);
-        setBaseImageDimensions({ width: w, height: h });
-        const defaultZoom = Math.min(900 / w, 650 / h, 1);
+
+        const { dataUrl, width, height } = await renderPdfPageToDataUrl(pdfDoc, 1, 2.0);
+        setBaseImageUrl(dataUrl);
+        setBaseImageDimensions({ width, height });
+        const defaultZoom = Math.min(900 / width, 650 / height, 1);
         setZoom(defaultZoom);
         setPan({ x: 0, y: 0 });
+      } catch (err) {
+        console.error('PDF load error:', err);
+        alert('ไม่สามารถเปิดไฟล์ PDF นี้ได้ กรุณาลองใหม่อีกครั้ง');
+      }
+    } else {
+      setPdfDocProxy(null);
+      setPdfTotalPages(1);
+      setPdfCurrentPage(1);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const url = e.target?.result as string;
+        const img = new Image();
+        img.onload = () => {
+          const w = img.naturalWidth || img.width;
+          const h = img.naturalHeight || img.height;
+          setBaseImageUrl(url);
+          setBaseImageName(file.name);
+          setBaseImageDimensions({ width: w, height: h });
+          const defaultZoom = Math.min(900 / w, 650 / h, 1);
+          setZoom(defaultZoom);
+          setPan({ x: 0, y: 0 });
+        };
+        img.src = url;
       };
-      img.src = url;
-    };
-    reader.readAsDataURL(file);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSwitchPdfPage = async (newPage: number) => {
+    if (!pdfDocProxy || newPage < 1 || newPage > pdfTotalPages) return;
+    try {
+      setPdfCurrentPage(newPage);
+      const { dataUrl, width, height } = await renderPdfPageToDataUrl(pdfDocProxy, newPage, 2.0);
+      setBaseImageUrl(dataUrl);
+      setBaseImageDimensions({ width, height });
+    } catch (err) {
+      console.error('Switch PDF page error:', err);
+    }
   };
 
   // Helper to add a layer on canvas
@@ -362,7 +403,7 @@ export default function App() {
           const file = e.target.files?.[0];
           if (file) handleUploadBaseImage(file);
         }}
-        accept="image/*"
+        accept="image/*,.pdf,application/pdf"
         className="hidden"
       />
 
@@ -421,6 +462,9 @@ export default function App() {
             setZoom={setZoom}
             pan={pan}
             setPan={setPan}
+            pdfCurrentPage={pdfCurrentPage}
+            pdfTotalPages={pdfTotalPages}
+            onSwitchPdfPage={handleSwitchPdfPage}
           />
         </main>
 

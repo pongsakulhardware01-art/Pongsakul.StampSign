@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Type, Check, X, BookmarkCheck } from 'lucide-react';
+import { Type, Check, X, BookmarkCheck, Sliders } from 'lucide-react';
 import { cropTransparentCanvas } from '../utils/imageProcessing';
 
 interface TextSignatureModalProps {
@@ -22,8 +22,10 @@ export const TextSignatureModal: React.FC<TextSignatureModalProps> = ({
   const [text, setText] = useState<string>('สมศักดิ์ มุ่งมั่นเจริญ');
   const [subText, setSubText] = useState<string>('(กรรมการผู้จัดการ)');
   const [fontFamily, setFontFamily] = useState<string>('Charm');
+  const [fontSize, setFontSize] = useState<number>(68);
+  const [skewAngle, setSkewAngle] = useState<number>(-8); // Natural cursive tilt
   const [color, setColor] = useState<string>('#dc2626'); // Red default
-  const [includeLine, setIncludeLine] = useState<boolean>(true);
+  const [underlineStyle, setUnderlineStyle] = useState<'curve' | 'straight' | 'none'>('curve');
   const [includeDate, setIncludeDate] = useState<boolean>(false);
   const [saveToLibrary, setSaveToLibrary] = useState<boolean>(true);
   const [previewUrl, setPreviewUrl] = useState<string>('');
@@ -39,17 +41,18 @@ export const TextSignatureModal: React.FC<TextSignatureModalProps> = ({
     { label: 'แดงชาด', value: '#dc2626' },
     { label: 'น้ำเงินปากกาหมึกซึม', value: '#1e3a8a' },
     { label: 'ดำมาตรฐาน', value: '#18181b' },
+    { label: 'ม่วงเข้มทางการ', value: '#581c87' },
   ];
 
   useEffect(() => {
     if (!isOpen || !text) return;
     renderTextToDataUrl();
-  }, [isOpen, text, subText, fontFamily, color, includeLine, includeDate]);
+  }, [isOpen, text, subText, fontFamily, fontSize, skewAngle, color, underlineStyle, includeDate]);
 
   const renderTextToDataUrl = (): { dataUrl: string; width: number; height: number } | null => {
     const canvas = document.createElement('canvas');
-    canvas.width = 900;
-    canvas.height = 360;
+    canvas.width = 1000;
+    canvas.height = 400;
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
 
@@ -62,22 +65,32 @@ export const TextSignatureModal: React.FC<TextSignatureModalProps> = ({
     const cx = canvas.width / 2;
     let mainY = canvas.height * 0.38;
 
-    ctx.font = `64px '${fontFamily}', sans-serif`;
-    ctx.fillText(text, cx, mainY);
+    ctx.save();
+    ctx.translate(cx, mainY);
+    ctx.rotate((skewAngle * Math.PI) / 180);
 
-    if (includeLine) {
+    ctx.font = `bold ${fontSize}px '${fontFamily}', sans-serif`;
+    ctx.fillText(text, 0, 0);
+
+    if (underlineStyle !== 'none') {
       const metrics = ctx.measureText(text);
-      const lineWidth = Math.max(220, metrics.width * 1.05);
-      const lineY = mainY + 38;
+      const lineWidth = Math.max(220, metrics.width * 1.1);
+      const lineY = fontSize * 0.45;
 
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.moveTo(cx - lineWidth / 2, lineY);
-      ctx.quadraticCurveTo(cx, lineY + 6, cx + lineWidth / 2, lineY - 2);
+      if (underlineStyle === 'curve') {
+        ctx.moveTo(-lineWidth / 2, lineY);
+        ctx.quadraticCurveTo(0, lineY + 8, lineWidth / 2, lineY - 3);
+      } else {
+        ctx.moveTo(-lineWidth / 2, lineY);
+        ctx.lineTo(lineWidth / 2, lineY);
+      }
       ctx.stroke();
     }
+    ctx.restore();
 
-    let currentY = mainY + 64;
+    let currentY = mainY + fontSize * 0.75;
     if (subText.trim()) {
       ctx.font = '24px Sarabun, sans-serif';
       ctx.fillText(subText, cx, currentY);
@@ -120,7 +133,7 @@ export const TextSignatureModal: React.FC<TextSignatureModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-bold text-zinc-900">สร้างลายเซ็นข้อความ (Text Signature)</h2>
-              <p className="text-xs text-zinc-500">พิมพ์ชื่อพร้อมเลือกฟอนต์ลายมือภาษาไทย/อังกฤษ</p>
+              <p className="text-xs text-zinc-500">ปรับแต่งฟอนต์ ขนาด เอียง และขีดเส้นใต้ได้อย่างยืดหยุ่น</p>
             </div>
           </div>
           <button
@@ -132,9 +145,13 @@ export const TextSignatureModal: React.FC<TextSignatureModalProps> = ({
         </div>
 
         <div className="p-6 flex flex-col gap-4 overflow-y-auto max-h-[75vh]">
+          {/* Live Preview Box */}
           <div>
-            <span className="block text-xs font-bold text-zinc-700 mb-1.5">ตัวอย่างลายเซ็น:</span>
-            <div className="h-36 rounded-2xl bg-white border-2 border-dashed border-zinc-300 flex items-center justify-center p-4 relative overflow-hidden shadow-inner">
+            <span className="block text-xs font-bold text-zinc-700 mb-1.5 flex items-center justify-between">
+              <span>ตัวอย่างลายเซ็นสด:</span>
+              <span className="text-[10px] font-mono text-zinc-400">อัปเดตแบบเรียลไทม์</span>
+            </span>
+            <div className="h-40 rounded-2xl bg-white border-2 border-dashed border-zinc-300 flex items-center justify-center p-4 relative overflow-hidden shadow-inner bg-checkerboard">
               {previewUrl && (
                 <img
                   src={previewUrl}
@@ -145,35 +162,93 @@ export const TextSignatureModal: React.FC<TextSignatureModalProps> = ({
             </div>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-3.5">
             <div>
               <label className="block text-xs font-bold text-zinc-700 mb-1">
-                ชื่อลายเซ็น:
+                ข้อความลายเซ็น (ชื่อ-นามสกุล):
               </label>
               <input
                 type="text"
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 placeholder="พิมพ์ชื่อ..."
-                className="w-full bg-white border border-zinc-300 rounded-xl px-3 py-2 text-zinc-900 text-xs focus:outline-none focus:border-red-500"
+                className="w-full bg-white border border-zinc-300 rounded-xl px-3 py-2 text-zinc-900 text-xs focus:outline-none focus:border-red-500 font-semibold"
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-zinc-700 mb-1">
-                ตำแหน่ง / ข้อความกำกับ:
-              </label>
-              <input
-                type="text"
-                value={subText}
-                onChange={(e) => setSubText(e.target.value)}
-                placeholder="เช่น (กรรมการผู้จัดการ)"
-                className="w-full bg-white border border-zinc-300 rounded-xl px-3 py-2 text-zinc-900 text-xs focus:outline-none focus:border-red-500"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-zinc-700 mb-1">
+                  ตำแหน่ง / ข้อความกำกับ:
+                </label>
+                <input
+                  type="text"
+                  value={subText}
+                  onChange={(e) => setSubText(e.target.value)}
+                  placeholder="เช่น (กรรมการผู้จัดการ)"
+                  className="w-full bg-white border border-zinc-300 rounded-xl px-3 py-2 text-zinc-900 text-xs focus:outline-none focus:border-red-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-zinc-700 mb-1">
+                  รูปแบบขีดเส้นใต้:
+                </label>
+                <select
+                  value={underlineStyle}
+                  onChange={(e) => setUnderlineStyle(e.target.value as any)}
+                  className="w-full bg-white border border-zinc-300 rounded-xl px-3 py-2 text-zinc-900 text-xs focus:outline-none focus:border-red-500 cursor-pointer"
+                >
+                  <option value="curve">เส้นโค้งพริ้วไหว (แนะนำ)</option>
+                  <option value="straight">เส้นตรงธรรมดา</option>
+                  <option value="none">ไม่มีเส้นใต้</option>
+                </select>
+              </div>
             </div>
 
+            {/* Customization Sliders (Size & Skew Angle) */}
+            <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-3.5 space-y-3">
+              <div className="flex items-center gap-2 text-xs font-bold text-zinc-800">
+                <Sliders className="w-3.5 h-3.5 text-red-600" />
+                <span>ปรับแต่งความยืดหยุ่นเพิ่มเติม</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <div className="flex justify-between text-[11px] font-semibold text-zinc-600 mb-1">
+                    <span>ขนาดฟอนต์:</span>
+                    <span className="font-mono text-red-600">{fontSize}px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="48"
+                    max="96"
+                    value={fontSize}
+                    onChange={(e) => setFontSize(Number(e.target.value))}
+                    className="w-full accent-red-600 cursor-pointer"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-[11px] font-semibold text-zinc-600 mb-1">
+                    <span>มุมเอียง (Slant):</span>
+                    <span className="font-mono text-red-600">{skewAngle}°</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="-20"
+                    max="20"
+                    value={skewAngle}
+                    onChange={(e) => setSkewAngle(Number(e.target.value))}
+                    className="w-full accent-red-600 cursor-pointer"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Fonts Selection */}
             <div>
-              <label className="block text-xs font-bold text-zinc-700 mb-1.5">รูปแบบฟอนต์:</label>
+              <label className="block text-xs font-bold text-zinc-700 mb-1.5">รูปแบบฟอนต์ลายมือ:</label>
               <div className="grid grid-cols-2 gap-2">
                 {fonts.map((f) => (
                   <button
@@ -205,21 +280,34 @@ export const TextSignatureModal: React.FC<TextSignatureModalProps> = ({
                         color === c.value ? 'border-white scale-110 shadow-sm ring-2 ring-red-500' : 'border-transparent opacity-80'
                       }`}
                       style={{ backgroundColor: c.value }}
+                      title={c.label}
                     />
                   ))}
                 </div>
               </div>
 
-              <label className="flex items-center gap-2 cursor-pointer text-xs text-red-700 font-bold">
-                <input
-                  type="checkbox"
-                  checked={saveToLibrary}
-                  onChange={(e) => setSaveToLibrary(e.target.checked)}
-                  className="rounded accent-red-600 w-4 h-4 cursor-pointer"
-                />
-                <BookmarkCheck className="w-3.5 h-3.5 text-red-600" />
-                บันทึกลงคลังคลาวด์
-              </label>
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-1.5 cursor-pointer text-xs text-zinc-700 font-semibold">
+                  <input
+                    type="checkbox"
+                    checked={includeDate}
+                    onChange={(e) => setIncludeDate(e.target.checked)}
+                    className="rounded accent-red-600 w-4 h-4 cursor-pointer"
+                  />
+                  <span>แสดงวันที่</span>
+                </label>
+
+                <label className="flex items-center gap-1.5 cursor-pointer text-xs text-red-700 font-bold">
+                  <input
+                    type="checkbox"
+                    checked={saveToLibrary}
+                    onChange={(e) => setSaveToLibrary(e.target.checked)}
+                    className="rounded accent-red-600 w-4 h-4 cursor-pointer"
+                  />
+                  <BookmarkCheck className="w-3.5 h-3.5 text-red-600" />
+                  <span>บันทึกคลาวด์</span>
+                </label>
+              </div>
             </div>
           </div>
         </div>
